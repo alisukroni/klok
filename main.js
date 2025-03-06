@@ -343,7 +343,8 @@ async function runBot() {
   const tokens = require("./tokens.json");
   const proxies = loadData("proxy.txt");
   const privateKeys = loadData("privateKeys.txt");
-
+  const minDelay = config.DELAY_START_BOT[0];
+  const maxDelay = config.DELAY_START_BOT[1];
   if (privateKeys.length > proxies.length) {
     log(`The number of privateKeys (${privateKeys.length}) and proxies (${proxies.length}) do not match. Please check again.`, "error");
     process.exit(1);
@@ -367,7 +368,7 @@ async function runBot() {
       return null; // Return null to filter out later
     }
 
-    const timeSleep = getRandomNumber(config.DELAY_START_BOT[0], config.DELAY_START_BOT[1]);
+    const timeSleep = getRandomNumber(minDelay, maxDelay);
     console.log(`[${address}] Waiting ${timeSleep}s to continue process...`.blue);
     await sleep(timeSleep);
 

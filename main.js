@@ -388,6 +388,7 @@ async function runBot() {
         hasError: true,
         points: 0,
         remainingChats: 0,
+        address: address,
       };
     }
   });
@@ -405,7 +406,7 @@ async function runBot() {
         return;
       }
       const timeSleep = getRandomNumber(config.DELAY_START_BOT[0], config.DELAY_START_BOT[1]);
-      console.log(`[${address}] Waiting ${timeSleep}s to continue process...`.blue);
+      console.log(`[${account?.address || account.accountIndex}] Waiting ${timeSleep}s to continue process...`.blue);
       await sleep(timeSleep);
       try {
         const apiClient = createApiClient(account.token, account.proxy);

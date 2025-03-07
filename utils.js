@@ -1,7 +1,7 @@
 const fs = require("fs");
 const colors = require("colors");
 const path = require("path");
-const { config } = require("./config.js");
+const settings = require("./config/config");
 require("dotenv").config();
 
 function _isArray(obj) {
@@ -84,21 +84,21 @@ function sleep(seconds = null) {
 
 function randomDelay() {
   return new Promise((resolve) => {
-    const minDelay = config.DELAY_REQUEST_API[0];
-    const maxDelay = config.DELAY_REQUEST_API[1];
+    const minDelay = settings.DELAY_REQUEST_API[0];
+    const maxDelay = settings.DELAY_REQUEST_API[1];
     const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
     setTimeout(resolve, delay * 1000);
   });
 }
 
 function saveToken(id, token) {
-  const tokens = JSON.parse(fs.readFileSync("token.json", "utf8"));
+  const tokens = JSON.parse(fs.readFileSync("tokens.json", "utf8"));
   tokens[id] = token;
-  fs.writeFileSync("token.json", JSON.stringify(tokens, null, 4));
+  fs.writeFileSync("tokens.json", JSON.stringify(tokens, null, 4));
 }
 
 function getToken(id) {
-  const tokens = JSON.parse(fs.readFileSync("token.json", "utf8"));
+  const tokens = JSON.parse(fs.readFileSync("tokens.json", "utf8"));
   return tokens[id] || null;
 }
 function isTokenExpired(token) {

@@ -5,11 +5,11 @@ const axios = require("axios");
 const { Wallet, ethers } = require("ethers");
 const { HttpsProxyAgent } = require("https-proxy-agent");
 const { SocksProxyAgent } = require("socks-proxy-agent");
-const { config } = require("./config.js");
 const { loadData, saveJson, getRandomElement, getRandomNumber, sleep } = require("./utils.js");
 const colors = require("colors");
+const settings = require("./config/config");
 
-if (!config.REF_CODE) {
+if (!settings.REF_CODE) {
   console.error("❌ Not found referral code!");
   process.exit(1);
 }
@@ -22,9 +22,7 @@ function generateWallet() {
 function createSiweMessage(address) {
   const nonce = ethers.hexlify(ethers.randomBytes(32)).slice(2);
   const timestamp = new Date().toISOString();
-  return (
-    `klokapp.ai wants you to sign in with your Ethereum account:\n${address}\n\n\n` + `URI: https://klokapp.ai/\n` + `Version: 1\n` + `Chain ID: 1\n` + `Nonce: ${nonce}\n` + `Issued At: ${timestamp}`
-  );
+  return `klokapp.ai wants you to sign in with your Ethereum account:\n${address}\n\n\nURI: https://klokapp.ai/\nVersion: 1\nChain ID: 1\nNonce: ${nonce}\nIssued At: ${timestamp}`;
 }
 
 async function signMessageAndRegister(wallet, agent) {
@@ -32,10 +30,10 @@ async function signMessageAndRegister(wallet, agent) {
   const message = createSiweMessage(address);
   console.log(`📝 Signing Message for ${address}`);
   const signedMessage = await wallet.signMessage(message);
-  const payload = { signedMessage, message, referral_code: config.REF_CODE };
+  const payload = { signedMessage, message, referral_code: settings.REF_CODE };
 
   try {
-    const response = await axios.post(`${config.API_BASE_URL}/verify`, payload, {
+    const response = await axios.post(`${settings.BASE_URL}/verify`, payload, {
       headers: {
         "Content-Type": "application/json",
         "User-Agent": "Mozilla/5.0",
@@ -93,11 +91,11 @@ async function checkProxyIP(proxy) {
 
 async function main() {
   console.log(colors.yellow("Tool được phát triển bởi nhóm tele Airdrop Hunter Siêu Tốc (https://t.me/airdrophuntersieutoc)"));
-  console.log(colors.magenta(`\nNumber ref: ${config.AMOUNT_REF} | Ref code: ${config.REF_CODE}`));
+  console.log(colors.magenta(`\nNumber ref buff: ${settings.AMOUNT_REF} | Ref code: ${settings.REF_CODE}`));
 
   const proxies = loadData("proxy.txt");
   let ip = "Unknown";
-  for (let i = 0; i < config.AMOUNT_REF; i++) {
+  for (let i = 0; i < settings.AMOUNT_REF; i++) {
     try {
       ip = await checkProxyIP(proxies[i]);
     } catch (error) {
@@ -106,7 +104,7 @@ async function main() {
     }
     const agent = getProxyAgent(proxies[i]); // Get a random proxy agent first
     const wallet = generateWallet();
-    console.log(`\n[${i + 1}/${config.AMOUNT_REF}]Start wallet ${wallet.address} | IP: ${ip}`.blue);
+    console.log(`\n[${i + 1}/${settings.AMOUNT_REF}]Start wallet ${wallet.address} | IP: ${ip}`.blue);
     await signMessageAndRegister(wallet, agent); // Use the agent for each request
   }
 }

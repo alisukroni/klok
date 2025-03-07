@@ -1,7 +1,6 @@
 const fs = require("fs");
 const colors = require("colors");
 const path = require("path");
-const settings = require("./config/config");
 require("dotenv").config();
 
 function _isArray(obj) {
@@ -84,8 +83,8 @@ function sleep(seconds = null) {
 
 function randomDelay() {
   return new Promise((resolve) => {
-    const minDelay = settings.DELAY_REQUEST_API[0];
-    const maxDelay = settings.DELAY_REQUEST_API[1];
+    const minDelay = process.env.DELAY_REQUEST_API[0];
+    const maxDelay = process.env.DELAY_REQUEST_API[1];
     const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
     setTimeout(resolve, delay * 1000);
   });

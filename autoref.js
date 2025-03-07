@@ -7,12 +7,7 @@ const { HttpsProxyAgent } = require("https-proxy-agent");
 const { SocksProxyAgent } = require("socks-proxy-agent");
 const { loadData, saveJson, getRandomElement, getRandomNumber, sleep } = require("./utils.js");
 const colors = require("colors");
-const settings = require("./config/config");
-
-if (!settings.REF_CODE) {
-  console.error("❌ Not found referral code!");
-  process.exit(1);
-}
+const settings = require("./config/config.js");
 
 function generateWallet() {
   const wallet = Wallet.createRandom();
@@ -92,6 +87,11 @@ async function checkProxyIP(proxy) {
 async function main() {
   console.log(colors.yellow("Tool được phát triển bởi nhóm tele Airdrop Hunter Siêu Tốc (https://t.me/airdrophuntersieutoc)"));
   console.log(colors.magenta(`\nNumber ref buff: ${settings.AMOUNT_REF} | Ref code: ${settings.REF_CODE}`));
+
+  if (!settings.REF_CODE) {
+    console.error("❌ Not found referral code!");
+    process.exit(1);
+  }
 
   const proxies = loadData("proxy.txt");
   let ip = "Unknown";

@@ -5,8 +5,8 @@ const colors = require("colors");
 const { HttpsProxyAgent } = require("https-proxy-agent");
 const readline = require("readline");
 const user_agents = require("./config/userAgents");
-const settings = require("./config/config");
-const { sleep, loadData, getRandomNumber, saveToken, isTokenExpired, saveJson, updateEnv, decodeJWT, getRandomElement } = require("./utils");
+const settings = require("./config/config.js");
+const { sleep, loadData, getRandomNumber, saveToken, isTokenExpired, saveJson, updateEnv, decodeJWT, getRandomElement } = require("./utils.js");
 const { Worker, isMainThread, parentPort, workerData } = require("worker_threads");
 const { checkBaseUrl } = require("./checkAPI");
 const { headers } = require("./core/header.js");
@@ -283,15 +283,6 @@ class ClientAPI {
     let model = "llama-3.3-70b-instruct";
     let currentThread = null;
     let amountChat = 0;
-    const limitData = await this.getRateLimit();
-    if (limitData.success) {
-      const { current_usage, limit, remaining, reset_time } = limitData.data;
-      amountChat = remaining;
-      if (remaining == 0 || current_usage >= limit) {
-        this.log(`Rate limit remaining: ${remaining}/${limit} | Reset time: ${Math.ceil(reset_time / 60)} minutes`, "warning");
-        return;
-      }
-    }
 
     const dataModels = await this.getModels();
     if (dataModels.success && dataModels.data?.length > 0) {
@@ -311,6 +302,16 @@ class ClientAPI {
     if (!currentThread) {
       const res = await this.handleNewThread(message, model);
       if (res) return await this.handleThreads();
+    }
+
+    const limitData = await this.getRateLimit();
+    if (limitData.success) {
+      const { current_usage, limit, remaining, reset_time } = limitData.data;
+      amountChat = remaining;
+      if (remaining == 0 || current_usage >= limit) {
+        this.log(`Rate limit remaining: ${remaining}/${limit} | Reset time: ${Math.ceil(reset_time / 60)} minutes`, "warning");
+        return;
+      }
     }
 
     this.log(`Starting chat...`, "info");

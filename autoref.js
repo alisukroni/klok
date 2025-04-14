@@ -8,6 +8,7 @@ const { SocksProxyAgent } = require("socks-proxy-agent");
 const { loadData, saveJson, getRandomElement, getRandomNumber, sleep } = require("./utils.js");
 const colors = require("colors");
 const settings = require("./config/config.js");
+const { solveCaptcha } = require("./captcha.js");
 
 function generateWallet() {
   const wallet = Wallet.createRandom();
@@ -21,11 +22,16 @@ function createSiweMessage(address) {
 }
 
 async function signMessageAndRegister(wallet, agent) {
+  const token = await solveCaptcha();
+  if (!token) {
+    console.error("❌ Failed to solve CAPTCHA");
+    return;
+  }
   const address = wallet.address;
   const message = createSiweMessage(address);
   console.log(`📝 Signing Message for ${address}`);
   const signedMessage = await wallet.signMessage(message);
-  const payload = { signedMessage, message, referral_code: settings.REF_CODE };
+  const payload = { signedMessage, message, referral_code: settings.REF_CODE, recaptcha_token: token };
 
   try {
     const response = await axios.post(`${settings.BASE_URL}/verify`, payload, {

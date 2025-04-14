@@ -11,7 +11,6 @@ const headers = {
   "Sec-Fetch-Mode": "cors",
   "Sec-Fetch-Site": "same-origin",
   "Cache-Control": "no-cache",
-  "user-device": "Edge/131.0.0.0#Windows/10",
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
 };
 

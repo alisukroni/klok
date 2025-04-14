@@ -100,6 +100,7 @@ function getToken(id) {
   const tokens = JSON.parse(fs.readFileSync("tokens.json", "utf8"));
   return tokens[id] || null;
 }
+
 function isTokenExpired(token) {
   if (!token) return true;
 

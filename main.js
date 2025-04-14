@@ -14,6 +14,7 @@ const { showBanner } = require("./core/banner.js");
 const localStorage = require("./localStorage.json");
 const { v4: uuidv4 } = require("uuid");
 const { Wallet, ethers } = require("ethers");
+const { solveCaptcha } = require("./captcha.js");
 const questions = loadData("questions.txt");
 
 class ClientAPI {
@@ -191,6 +192,7 @@ class ClientAPI {
             process.exit(1);
           }
           this.token = token;
+          return this.makeRequest(url, method, data, options);
         }
         if (error.status == 400) {
           this.log(`Invalid request for ${url}, maybe have new update from server | contact: https://t.me/airdrophuntersieutoc to get new update!`, "error");
@@ -203,15 +205,21 @@ class ClientAPI {
       }
       currRetries++;
     } while (currRetries <= retries && !success);
+    return { status: 500, success: false, error: "Unknow" };
   }
 
   async auth() {
+    const token = await solveCaptcha();
+    if (!token) {
+      this.log("Captcha not solved, skipping...", "warning");
+      return { success: false, data: null };
+    }
     const wallet = this.wallet;
     const nonce = ethers.hexlify(ethers.randomBytes(32)).slice(2);
     const timestamp = new Date().toISOString();
     const message = `klokapp.ai wants you to sign in with your Ethereum account:\n${wallet.address}\n\n\nURI: https://klokapp.ai/\nVersion: 1\nChain ID: 1\nNonce: ${nonce}\nIssued At: ${timestamp}`;
     const signedMessage = await wallet.signMessage(message);
-    const payload = { signedMessage, message, referral_code: settings.REF_CODE };
+    const payload = { signedMessage, message, referral_code: settings.REF_CODE, recaptcha_token: token };
     return this.makeRequest(`${this.baseURL}/verify`, "post", payload, { isAuth: true });
   }
 
@@ -334,7 +342,7 @@ class ClientAPI {
       };
       const result = await this.sendMessage(newPayload);
       if (result.success) {
-        this.log(`Send message: ${message} `, "success");
+        this.log(`Send message: ${newMessage} `, "success");
         amountChat--;
       } else {
         if (JSON.stringify(result.error || {}).includes("stream has been aborted")) {
@@ -342,9 +350,9 @@ class ClientAPI {
             const res = await this.handleNewThread(message, model);
             if (res) return await this.handleThreads();
           } else {
-            this.log(`Send message ${message} failed | ${JSON.stringify(result.error || {})}`, "warning");
+            this.log(`Send message ${newMessage} failed | ${JSON.stringify(result.error || {})}`, "warning");
           }
-        } else this.log(`Send message ${message} failed | ${JSON.stringify(result.error || {})}`, "warning");
+        } else this.log(`Send message ${newMessage} failed | ${JSON.stringify(result.error || {})}`, "warning");
       }
       const timeSleep = getRandomNumber(settings.DELAY_CHAT[0], settings.DELAY_CHAT[1]);
       this.log(`Sleeping for ${timeSleep} seconds to next message...`, "info");
@@ -462,7 +470,7 @@ async function main() {
   // await sleep(1);
   const privateKeys = loadData("privateKeys.txt");
   const proxies = loadData("proxy.txt");
-  const tokens = require("./tokens.json");
+  let tokens = require("./tokens.json");
   const data = privateKeys.map((item) => (item.startsWith("0x") ? item : `0x${item}`)).reverse();
   if (data.length == 0 || (data.length > proxies.length && settings.USE_PROXY)) {
     console.log("Số lượng proxy và data phải bằng nhau.".red);
@@ -482,6 +490,7 @@ async function main() {
   data.map((val, i) => new ClientAPI(val, i, proxies[i], endpoint, tokens).createUserAgent());
   await sleep(1);
   while (true) {
+    tokens = require("./tokens.json");
     let currentIndex = 0;
     const errors = [];
     while (currentIndex < data.length) {

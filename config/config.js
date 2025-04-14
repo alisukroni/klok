@@ -38,6 +38,12 @@ const settings = {
   BASE_URL: process.env.BASE_URL ? process.env.BASE_URL : "https://api1-pp.klokapp.ai/v1",
   REF_CODE: process.env.REF_CODE ? process.env.REF_CODE : "WGFMTG2R",
 
+  TYPE_CAPTCHA: process.env.TYPE_CAPTCHA ? process.env.TYPE_CAPTCHA : null,
+  API_KEY_2CAPTCHA: process.env.API_KEY_2CAPTCHA ? process.env.API_KEY_2CAPTCHA : null,
+  API_KEY_ANTI_CAPTCHA: process.env.API_KEY_ANTI_CAPTCHA ? process.env.API_KEY_ANTI_CAPTCHA : null,
+  CAPTCHA_URL: process.env.CAPTCHA_URL ? process.env.CAPTCHA_URL : null,
+  WEBSITE_KEY: process.env.WEBSITE_KEY ? process.env.WEBSITE_KEY : null,
+
   DELAY_BETWEEN_REQUESTS: process.env.DELAY_BETWEEN_REQUESTS && _isArray(process.env.DELAY_BETWEEN_REQUESTS) ? JSON.parse(process.env.DELAY_BETWEEN_REQUESTS) : [1, 5],
   DELAY_START_BOT: process.env.DELAY_START_BOT && _isArray(process.env.DELAY_START_BOT) ? JSON.parse(process.env.DELAY_START_BOT) : [1, 15],
   DELAY_CHAT: process.env.DELAY_CHAT && _isArray(process.env.DELAY_CHAT) ? JSON.parse(process.env.DELAY_CHAT) : [1, 15],

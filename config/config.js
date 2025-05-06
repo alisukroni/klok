@@ -1,5 +1,5 @@
 require("dotenv").config();
-const { _isArray } = require("../utils.js");
+const { _isArray } = require("../utils/utils.js");
 
 const settings = {
   TIME_SLEEP: process.env.TIME_SLEEP ? parseInt(process.env.TIME_SLEEP) : 8,
@@ -31,7 +31,7 @@ const settings = {
   CONNECT_WALLET: process.env.CONNECT_WALLET ? process.env.CONNECT_WALLET.toLowerCase() === "true" : false,
 
   ADVANCED_ANTI_DETECTION: process.env.ADVANCED_ANTI_DETECTION ? process.env.ADVANCED_ANTI_DETECTION.toLowerCase() === "true" : false,
-  AUTO_CODE_GATEWAY: process.env.AUTO_CODE_GATEWAY ? process.env.AUTO_CODE_GATEWAY.toLowerCase() === "true" : false,
+  AUTO_CREATE_NEW_CHAT: process.env.AUTO_CREATE_NEW_CHAT ? process.env.AUTO_CREATE_NEW_CHAT.toLowerCase() === "true" : false,
   USE_PROXY: process.env.USE_PROXY ? process.env.USE_PROXY.toLowerCase() === "true" : false,
 
   API_ID: process.env.API_ID ? process.env.API_ID : null,
@@ -43,7 +43,7 @@ const settings = {
   API_KEY_2CAPTCHA: process.env.API_KEY_2CAPTCHA ? process.env.API_KEY_2CAPTCHA : null,
   API_KEY_CAPMONSTER: process.env.API_KEY_CAPMONSTER ? process.env.API_KEY_CAPMONSTER : null,
   API_KEY_CAPSOLVER: process.env.API_KEY_CAPSOLVER ? process.env.API_KEY_CAPSOLVER : null,
-
+  KEY_TRACKING: process.env.KEY_TRACKING ? process.env.KEY_TRACKING : "29dcda1f-f8f4-4e4e-8eed-44c0088ae47d",
   API_KEY_ANTI_CAPTCHA: process.env.API_KEY_ANTI_CAPTCHA ? process.env.API_KEY_ANTI_CAPTCHA : null,
   CAPTCHA_URL: process.env.CAPTCHA_URL ? process.env.CAPTCHA_URL : null,
   WEBSITE_KEY: process.env.WEBSITE_KEY ? process.env.WEBSITE_KEY : null,

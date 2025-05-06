@@ -6,19 +6,20 @@ const { HttpsProxyAgent } = require("https-proxy-agent");
 const readline = require("readline");
 const user_agents = require("./config/userAgents");
 const settings = require("./config/config.js");
-const { sleep, loadData, getRandomNumber, saveToken, isTokenExpired, saveJson, updateEnv, decodeJWT, getRandomElement } = require("./utils.js");
+const { sleep, loadData, getRandomNumber, saveToken, isTokenExpired, saveJson, updateEnv, decodeJWT, getRandomElement } = require("./utils/utils.js");
 const { Worker, isMainThread, parentPort, workerData } = require("worker_threads");
-const { checkBaseUrl } = require("./checkAPI");
+const { checkBaseUrl } = require("./utils/checkAPI");
 const { headers } = require("./core/header.js");
 const { showBanner } = require("./core/banner.js");
 const localStorage = require("./localStorage.json");
 const { v4: uuidv4 } = require("uuid");
 const { Wallet, ethers } = require("ethers");
-const { solveCaptcha } = require("./captcha.js");
+const { solveCaptcha } = require("./utils/captcha.js");
 const questions = loadData("questions.txt");
+const events = require("./events.json");
 
 class ClientAPI {
-  constructor(itemData, accountIndex, proxy, baseURL, tokens) {
+  constructor(itemData, accountIndex, proxy, baseURL) {
     this.headers = headers;
     this.baseURL = baseURL;
     this.itemData = itemData;
@@ -27,8 +28,7 @@ class ClientAPI {
     this.proxyIP = null;
     this.session_name = null;
     this.session_user_agents = this.#load_session_data();
-    this.token = tokens[this.session_name] || null;
-    this.tokens = tokens;
+    this.token = null;
     this.localStorage = localStorage;
     this.wallet = new ethers.Wallet(this.itemData);
   }
@@ -149,17 +149,20 @@ class ClientAPI {
     method,
     data = {},
     options = {
-      retries: 1,
+      retries: 2,
       isAuth: false,
+      extraHeaders: {},
+      refreshToken: null,
     }
   ) {
-    const { retries, isAuth } = options;
+    const { retries, isAuth, extraHeaders, refreshToken } = options;
 
     const headers = {
       ...this.headers,
+      ...extraHeaders,
     };
 
-    if (!isAuth) {
+    if (!isAuth && this.token) {
       headers["x-session-token"] = this.token;
     }
 
@@ -168,45 +171,51 @@ class ClientAPI {
       proxyAgent = new HttpsProxyAgent(this.proxy);
     }
     let currRetries = 0,
-      success = false;
+      errorMessage = null,
+      errorStatus = 0;
+
     do {
       try {
         const response = await axios({
           method,
-          url: `${url}`,
-          data,
+          url,
           headers,
-          httpsAgent: proxyAgent,
-          timeout: 30000,
+          timeout: 120000,
+          ...(proxyAgent ? { httpsAgent: proxyAgent, httpAgent: proxyAgent } : {}),
+          ...(method.toLowerCase() != "get" ? { data } : {}),
         });
-        success = true;
-        if (response?.data?.data) return { status: response.status, success: true, data: response.data.data };
-        return { success: true, data: response.data, status: response.status };
+        if (response?.data?.data) return { status: response.status, success: true, data: response.data.data, error: null };
+        return { success: true, data: response.data, status: response.status, error: null };
       } catch (error) {
+        errorStatus = error.status;
+        errorMessage = error?.response?.data?.message ? error?.response?.data : error.message;
+        this.log(`Request failed: ${url} | Status: ${error.status} | ${JSON.stringify(errorMessage || {})}...`, "warning");
+
         if (error.message.includes("stream has been aborted")) {
           return { success: false, status: error.status, data: null, error: error.response.data.error || error.response.data.message || error.message };
         }
+
         if (error.status == 401) {
-          const token = await this.getValidToken(true);
-          if (!token) {
-            process.exit(1);
-          }
-          this.token = token;
-          return this.makeRequest(url, method, data, options);
+          this.log(`Unauthorized: ${url} | trying get new token...`);
+          this.token = await this.getValidToken(true);
+          return await this.makeRequest(url, method, data, options);
         }
         if (error.status == 400) {
-          console.log(error.response.data);
-          this.log(`$Invalid request for ${url}, maybe have new update from server | contact: https://t.me/airdrophuntersieutoc to get new update!`, "error");
-          return { success: false, status: error.status, error: error.response.data.error || error.response.data.message || error.message };
+          this.log(`Invalid request for ${url}, maybe have new update from server | contact: https://t.me/airdrophuntersieutoc to get new update!`, "error");
+          return { success: false, status: error.status, error: errorMessage, data: null };
         }
-        this.log(`Yêu cầu thất bại: ${url} | ${error.message} | đang thử lại...`, "warning");
-        success = false;
-        await sleep(settings.DELAY_BETWEEN_REQUESTS);
-        if (currRetries == retries) return { status: error.status, success: false, error: error.message };
+        if (error.status == 429) {
+          this.log(`Rate limit ${JSON.stringify(errorMessage)}, waiting 60s to retries`, "warning");
+          await sleep(60);
+        }
+        if (currRetries > retries) {
+          return { status: error.status, success: false, error: errorMessage, data: null };
+        }
+        currRetries++;
+        await sleep(5);
       }
-      currRetries++;
-    } while (currRetries <= retries && !success);
-    return { status: 500, success: false, error: "Unknow" };
+    } while (currRetries <= retries);
+    return { status: errorStatus, success: false, error: errorMessage, data: null };
   }
 
   async auth() {
@@ -272,11 +281,24 @@ class ClientAPI {
     return this.makeRequest(`${this.baseURL}/chat`, "post", payload);
   }
 
+  async getTitle(payload) {
+    return this.makeRequest(`${this.baseURL}/chat/title`, "post", payload);
+  }
+
+  async tracking(payload) {
+    return this.makeRequest(`https://vega.mira.network/api/v1/track`, "post", payload, {
+      extraHeaders: {
+        "write-key": settings.KEY_TRACKING,
+      },
+    });
+  }
+
   async handleNewThread(message, model) {
     this.log(`Creating new thread | Model: ${model}`, "warning");
+    const id = uuidv4();
     const payload = {
-      id: uuidv4(),
-      title: "New Chat",
+      id: id,
+      title: "",
       messages: [
         {
           role: "user",
@@ -289,17 +311,49 @@ class ClientAPI {
       language: "english",
     };
     const resultNewThread = await this.createNewThread(payload);
+    const res = await this.getTitle({
+      id: id,
+      messages: [
+        {
+          role: "user",
+          content: message,
+        },
+      ],
+      language: "english",
+      model: model,
+    });
     if (resultNewThread.success) {
       this.log(`Create new thread ${JSON.stringify(resultNewThread.data) || {}} success!`, "success");
-      return true;
+      return {
+        ...payload,
+        ...(res?.data?.title ? { title: res.data.title } : {}),
+      };
     }
     return false;
   }
 
-  async handleThreads() {
+  async handleTracking(eventname, payload) {
+    const event = events.find((i) => i.event_name == eventname);
+    if (!event) return;
+    const res = await this.tracking(payload);
+    console.log(res);
+  }
+
+  async handleThreads(currentThread = null) {
     let model = "llama-3.3-70b-instruct";
-    let currentThread = null;
     let amountChat = 0;
+    let total = 0;
+
+    const limitData = await this.getRateLimit();
+    if (limitData.success) {
+      const { current_usage, limit, remaining, reset_time } = limitData.data;
+      amountChat = remaining;
+      total = remaining;
+      if (remaining == 0 || current_usage >= limit) {
+        this.log(`Rate limit remaining: ${remaining}/${limit} | Reset time: ${Math.ceil(reset_time / 60)} minutes`, "warning");
+        return;
+      }
+    }
 
     const dataModels = await this.getModels();
     if (dataModels.success && dataModels.data?.length > 0) {
@@ -307,28 +361,22 @@ class ClientAPI {
     }
 
     //lay ds thead
-    const threads = await this.getThreads();
-    if (!threads.success) {
-      this.log("Can't get threads", "error");
-      return;
-    }
-    currentThread = getRandomElement(threads.data);
     const message = getRandomElement(questions);
 
-    //khong co thread nao tao moi
-    if (!currentThread) {
-      const res = await this.handleNewThread(message, model);
-      if (res) return await this.handleThreads();
+    if (!currentThread && !settings.AUTO_CREATE_NEW_CHAT) {
+      const threads = await this.getThreads();
+      if (!threads.success) {
+        this.log("Can't get threads!", "warning");
+      } else {
+        currentThread = getRandomElement(threads.data);
+      }
     }
 
-    const limitData = await this.getRateLimit();
-    if (limitData.success) {
-      const { current_usage, limit, remaining, reset_time } = limitData.data;
-      amountChat = remaining;
-      if (remaining == 0 || current_usage >= limit) {
-        this.log(`Rate limit remaining: ${remaining}/${limit} | Reset time: ${Math.ceil(reset_time / 60)} minutes`, "warning");
-        return;
-      }
+    if (!currentThread) {
+      amountChat--;
+      const res = await this.handleNewThread(message, model);
+      if (res?.id) currentThread = res;
+      else return this.log(`Can't starting chat...`, "warning");
     }
 
     this.log(`Starting chat...`, "info");
@@ -350,36 +398,50 @@ class ClientAPI {
         language: "english",
       };
       const result = await this.sendMessage(newPayload);
+      // await this.handleTracking("message_sent", {
+      //   event_name: "message_sent",
+      //   properties: {
+      //     thread_id: currentThread.id,
+      //     thread_title: currentThread.title,
+      //     thread_sources: [],
+      //     input_value: message,
+      //     model: model,
+      //     isSearchEnabled: false,
+      //   },
+      //   user_id: null,
+      //   anonymous_id: "xxx",
+      //   timestamp: new Date().toISOString(),
+      // });
       if (result.success) {
-        this.log(`Send message: ${newMessage} `, "success");
-        amountChat--;
+        this.log(`[${amountChat}/${total}] Send message: ${newMessage} `, "success");
       } else {
-        if (JSON.stringify(result.error || {}).includes("stream has been aborted")) {
-          if (threads.data?.length && threads.data?.length < 10) {
+        if (JSON.stringify(result.error || {}).includes("stream has been aborted") && amountChat > 0) {
+          if (threads?.data?.length && threads?.data?.length < 10) {
             const res = await this.handleNewThread(message, model);
-            if (res) return await this.handleThreads();
+            if (res) return await this.handleThreads(res);
+            else return this.log(`Can't starting chat...`, "warning");
           } else {
-            this.log(`Send message ${newMessage} failed | ${JSON.stringify(result.error || {})}`, "warning");
+            this.log(`[${amountChat}/${total}] Send message ${newMessage} failed | ${JSON.stringify(result.error || {})}`, "warning");
           }
-        } else this.log(`Send message ${newMessage} failed | ${JSON.stringify(result.error || {})}`, "warning");
+        } else this.log(`[${amountChat}/${total}] Send message ${newMessage} failed | ${JSON.stringify(result.error || {})}`, "warning");
       }
-      const timeSleep = getRandomNumber(settings.DELAY_CHAT[0], settings.DELAY_CHAT[1]);
-      this.log(`Sleeping for ${timeSleep} seconds to next message...`, "info");
-      await sleep(timeSleep);
+      if (amountChat > 0) {
+        const timeSleep = getRandomNumber(settings.DELAY_CHAT[0], settings.DELAY_CHAT[1]);
+        this.log(`Sleeping for ${timeSleep} seconds to next message...`, "info");
+        await sleep(timeSleep);
+      }
     }
   }
 
   async handleTasks() {
     const ids = settings.TASKS_ID;
     for (const id of ids) {
-      // if (this.localStorage[this.session_name]?.tasksCompleted === id) continue;
       const isCompleted = await this.getTask(id);
       if (isCompleted?.data?.has_completed === false) {
         this.log(`Trying complete task ${id}`);
         const result = await this.completeTask(id);
         if (result.success) {
           this.log(`Claim task ${id} success | ${JSON.stringify(result.data || {})}`, "success");
-          // saveJson(this.session_name, id, "localStorage.json");
         }
       } else if (isCompleted?.data?.has_completed === true) {
       } else {
@@ -398,7 +460,7 @@ class ClientAPI {
       this.log("No found token or experied, trying get new token...", "warning");
       const newToken = await this.auth();
       if (newToken.success && newToken.data?.session_token) {
-        saveJson(this.session_name, newToken.data.session_token, "tokens.json");
+        await saveJson(this.session_name, newToken.data.session_token, "localStorage.json");
         return newToken.data.session_token;
       }
       this.log("Can't get new token...", "warning");
@@ -416,7 +478,7 @@ class ClientAPI {
     } while (retries < 2);
     const balanceData = await this.getBalance();
     if (userData.success && balanceData.success) {
-      this.log(`Points: ${balanceData.data.total_points} | Tier: ${userData.data.tier} | Details: ${JSON.stringify(balanceData.data.points || {})}`, "custom");
+      this.log(`Tier: ${userData.data.tier} | Points: ${balanceData.data.total_points}`, "custom");
     } else {
       return this.log("Can't sync new data...skipping", "warning");
     }
@@ -426,7 +488,7 @@ class ClientAPI {
   async runAccount() {
     const accountIndex = this.accountIndex;
     this.session_name = this.wallet.address;
-    this.token = this.tokens[this.session_name];
+    this.token = this.localStorage[this.session_name];
     this.#set_headers();
     if (settings.USE_PROXY) {
       try {
@@ -445,7 +507,9 @@ class ClientAPI {
     this.token = token;
     const userData = await this.handleSyncData();
     if (userData.success) {
-      await this.handleTasks();
+      if (settings.AUTO_TASK) {
+        await this.handleTasks();
+      }
       await sleep(1);
       await this.handleThreads();
       await sleep(1);
@@ -457,8 +521,8 @@ class ClientAPI {
 }
 
 async function runWorker(workerData) {
-  const { itemData, accountIndex, proxy, hasIDAPI, tokens } = workerData;
-  const to = new ClientAPI(itemData, accountIndex, proxy, hasIDAPI, tokens);
+  const { itemData, accountIndex, proxy, hasIDAPI } = workerData;
+  const to = new ClientAPI(itemData, accountIndex, proxy, hasIDAPI);
   try {
     await Promise.race([to.runAccount(), new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 24 * 60 * 60 * 1000))]);
     parentPort.postMessage({
@@ -474,12 +538,10 @@ async function runWorker(workerData) {
 }
 
 async function main() {
+  console.clear();
   showBanner();
-  // fs.writeFile("./tokens.json", JSON.stringify({}), (err) => {});
-  // await sleep(1);
   const privateKeys = loadData("privateKeys.txt");
   const proxies = loadData("proxy.txt");
-  let tokens = require("./tokens.json");
   const data = privateKeys.map((item) => (item.startsWith("0x") ? item : `0x${item}`)).reverse();
   if (data.length == 0 || (data.length > proxies.length && settings.USE_PROXY)) {
     console.log("Số lượng proxy và data phải bằng nhau.".red);
@@ -496,10 +558,9 @@ async function main() {
   if (!endpoint) return console.log(`Không thể tìm thấy ID API, thử lại sau!`.red);
   console.log(`${message}`.yellow);
   // process.exit();
-  data.map((val, i) => new ClientAPI(val, i, proxies[i], endpoint, tokens).createUserAgent());
+  data.map((val, i) => new ClientAPI(val, i, proxies[i], endpoint).createUserAgent());
   await sleep(1);
   while (true) {
-    tokens = require("./tokens.json");
     let currentIndex = 0;
     const errors = [];
     while (currentIndex < data.length) {
@@ -512,7 +573,6 @@ async function main() {
             itemData: data[currentIndex],
             accountIndex: currentIndex,
             proxy: proxies[currentIndex % proxies.length],
-            tokens,
           },
         });
 

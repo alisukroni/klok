@@ -2,7 +2,10 @@ const fs = require("fs");
 const colors = require("colors");
 const path = require("path");
 require("dotenv").config();
-
+const { jwtDecode } = require("jwt-decode");
+const fsPromises = require("fs").promises; // Sử dụng fs.promises
+const AsyncLock = require("async-lock");
+const lock = new AsyncLock();
 function _isArray(obj) {
   if (Array.isArray(obj) && obj.length > 0) {
     return true;
@@ -65,7 +68,7 @@ function updateEnv(variable, value) {
   });
 }
 
-function sleep(seconds = null) {
+async function sleep(seconds = null) {
   if (seconds && typeof seconds === "number") return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 
   let DELAY_BETWEEN_REQUESTS = [1, 5];
@@ -75,7 +78,7 @@ function sleep(seconds = null) {
   min = DELAY_BETWEEN_REQUESTS[0];
   max = DELAY_BETWEEN_REQUESTS[1];
 
-  return new Promise((resolve) => {
+  return await new Promise((resolve) => {
     const delay = Math.floor(Math.random() * (max - min + 1)) + min;
     setTimeout(resolve, delay * 1000);
   });
@@ -100,32 +103,22 @@ function getToken(id) {
   const tokens = JSON.parse(fs.readFileSync("tokens.json", "utf8"));
   return tokens[id] || null;
 }
-
 function isTokenExpired(token) {
-  if (!token) return true;
+  if (!token) return { isExpired: true, expirationDate: new Date().toLocaleString() };
 
   try {
-    const [, payload] = token.split(".");
+    const payload = jwtDecode(token);
     if (!payload) return true;
 
-    const decodedPayload = JSON.parse(Buffer.from(payload, "base64").toString());
     const now = Math.floor(Date.now() / 1000);
 
-    if (!decodedPayload.exp) {
-      // console.log("Eternal token".yellow);
-      return false;
-    }
+    const expirationDate = new Date(payload.exp * 1000).toLocaleString();
+    const isExpired = now > payload.exp;
 
-    const expirationDate = new Date(decodedPayload.exp * 1000);
-    const isExpired = now > decodedPayload.exp;
-
-    console.log(`Token expires after: ${expirationDate.toLocaleString()}`.magenta);
-    console.log(`Token status: ${isExpired ? "Expired".yellow : "Valid".green}`);
-
-    return isExpired;
+    return { isExpired, expirationDate };
   } catch (error) {
     console.log(`Error checking token: ${error.message}`.red);
-    return true;
+    return { isExpired: true, expirationDate: new Date().toLocaleString() };
   }
 }
 
@@ -148,7 +141,7 @@ function getRandomElement(arr) {
 }
 
 function getRandomNumber(min, max) {
-  return Math.floor(Math.random() * (max - min) + min);
+  return parseFloat((Math.random() * (max - min) + min).toFixed(6));
 }
 
 function loadData(file) {
@@ -188,10 +181,17 @@ function log(msg, type = "info") {
   }
 }
 
-function saveJson(id, value, filename) {
-  const data = JSON.parse(fs.readFileSync(filename, "utf8"));
-  data[id] = value;
-  fs.writeFileSync(filename, JSON.stringify(data, null, 4));
+async function saveJson(id, value, filename) {
+  await lock.acquire("fileLock", async () => {
+    try {
+      const data = await fsPromises.readFile(filename, "utf8");
+      const jsonData = JSON.parse(data);
+      jsonData[id] = value;
+      await fsPromises.writeFile(filename, JSON.stringify(jsonData, null, 4));
+    } catch (error) {
+      console.error("Error saving JSON:", error);
+    }
+  });
 }
 
 function getItem(id, filename) {
@@ -215,6 +215,21 @@ function generateComplexId(length = 9) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
+}
+
+function generateRandomNumber(length) {
+  if (length < 1) return null;
+
+  // Chọn chữ số đầu tiên từ 1 đến 4
+  const firstDigit = Math.floor(Math.random() * 4) + 1; // 1 đến 4
+  let number = firstDigit.toString(); // Bắt đầu với chữ số đầu tiên
+
+  // Tạo các chữ số còn lại
+  for (let i = 1; i < length; i++) {
+    number += Math.floor(Math.random() * 10); // 0 đến 9
+  }
+
+  return number;
 }
 
 function getRandomNineDigitNumber() {
@@ -263,4 +278,5 @@ module.exports = {
   randomDelay,
   parseQueryString,
   getRandomNineDigitNumber,
+  generateRandomNumber,
 };

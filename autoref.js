@@ -5,10 +5,10 @@ const axios = require("axios");
 const { Wallet, ethers } = require("ethers");
 const { HttpsProxyAgent } = require("https-proxy-agent");
 const { SocksProxyAgent } = require("socks-proxy-agent");
-const { loadData, saveJson, getRandomElement, getRandomNumber, sleep } = require("./utils.js");
+const { loadData, saveJson, getRandomElement, getRandomNumber, sleep } = require("./utils/utils.js");
 const colors = require("colors");
 const settings = require("./config/config.js");
-const { solveCaptcha } = require("./captcha.js");
+const { solveCaptcha } = require("./utils/captcha.js");
 
 function generateWallet() {
   const wallet = Wallet.createRandom();

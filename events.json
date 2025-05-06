@@ -1,0 +1,59 @@
+[
+  {
+    "event_name": "page",
+    "properties": {
+      "name": null,
+      "path": "/app",
+      "url": "https://klokapp.ai/app",
+      "title": "Klok - Trustless verified intelligence on command",
+      "referrer": ""
+    },
+    "user_id": null,
+    "anonymous_id": "xxx",
+    "timestamp": "2025-05-06T14:05:30.221Z"
+  },
+  {
+    "event_name": "app_page_load",
+    "properties": {
+      "search": "",
+      "search_object": {}
+    },
+    "user_id": null,
+    "anonymous_id": "xxx",
+    "timestamp": "2025-05-06T14:05:30.228Z"
+  },
+  {
+    "event_name": "home_page_load",
+    "properties": {
+      "search": "",
+      "search_object": {}
+    },
+    "user_id": null,
+    "anonymous_id": "xxx",
+    "timestamp": "2025-05-06T14:05:28.820Z"
+  },
+  {
+    "event_name": "prompt_response_received",
+    "properties": {
+      "thread_id": "d63cfacd-8b48-4af6-a713-7e631616413f",
+      "message": "Here are some startup ideas to consider:\n\n1. **Sustainable Products**: Create eco-friendly alternatives for everyday items, like reusable straws or biodegradable packaging.\n2. **Remote Work Solutions**: Develop tools or platforms that enhance productivity and collaboration for remote teams.\n3. **Health and Wellness Apps**: Offer personalized fitness or mental health solutions through AI or telehealth services.\n4. **Online Learning Platforms**: Create specialized courses in niche fields or promote lifelong learning through micro-credentials.\n5. **Smart Home Technology**: Innovate devices that enhance home automation, security, or energy efficiency.\n\nLet me know if you want to explore any idea further!"
+    },
+    "user_id": null,
+    "anonymous_id": "xxx",
+    "timestamp": "2025-05-06T14:08:16.747Z"
+  },
+  {
+    "event_name": "message_sent",
+    "properties": {
+      "thread_id": "d63cfacd-8b48-4af6-a713-7e631616413f",
+      "thread_title": "Startup Concepts",
+      "thread_sources": [],
+      "input_value": "implement tracking etherjs",
+      "model": "gpt-4o-mini",
+      "isSearchEnabled": false
+    },
+    "user_id": null,
+    "anonymous_id": "xxx",
+    "timestamp": "2025-05-06T14:09:33.719Z"
+  }
+]

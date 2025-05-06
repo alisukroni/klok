@@ -14,7 +14,7 @@ const solve2Captcha = async () => {
           type: "RecaptchaV3TaskProxyless",
           websiteURL: config.CAPTCHA_URL,
           websiteKey: config.WEBSITE_KEY,
-          isEnterprise: true,
+          minScore: 0.9,
         },
       },
       {
@@ -51,13 +51,13 @@ const solve2Captcha = async () => {
     // Step 3: Use the CAPTCHA solution
     if (result.status === "ready") {
       console.log(colors.green("CAPTCHA success.."));
-      return result.solution.token; // This is the CAPTCHA token
+      return result.solution.gRecaptchaResponse; // This is the CAPTCHA token
     } else {
-      console.error("Error:", result);
+      console.error("Error captcha:", result);
       return null;
     }
   } catch (error) {
-    console.error("Error:", error.message);
+    console.error("Error captcha:", error.message);
     return null;
   }
 };
@@ -74,7 +74,7 @@ const solveAntiCaptcha = async () => {
           type: "RecaptchaV3TaskProxyless",
           websiteURL: config.CAPTCHA_URL,
           websiteKey: config.WEBSITE_KEY,
-          isEnterprise: true,
+          minScore: 0.9,
         },
       },
       {
@@ -113,13 +113,75 @@ const solveAntiCaptcha = async () => {
     // Step 3: Use the CAPTCHA solution
     if (result.status === "ready") {
       console.log(colors.green("CAPTCHA success.."));
-      return result.solution.token; // This is the CAPTCHA token
+      return result.solution.gRecaptchaResponse; // This is the CAPTCHA token
     } else {
-      console.error("Error:", result);
+      console.error("Error captcha:", result);
       return null;
     }
   } catch (error) {
-    console.error("Error:", error.message);
+    console.error("Error captcha:", error.message);
+    return null;
+  }
+};
+
+const solveMonsterCaptcha = async () => {
+  let retries = 5;
+  try {
+    // Step 1: Create a CAPTCHA task
+    const taskResponse = await axios.post(
+      "https://api.capmonster.cloud/createTask",
+      {
+        clientKey: config.API_KEY_CAPMONSTER,
+        task: {
+          type: "RecaptchaV3TaskProxyless",
+          websiteURL: config.CAPTCHA_URL,
+          websiteKey: config.WEBSITE_KEY,
+          minScore: 0.9,
+        },
+      },
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+
+    const requestId = taskResponse.data.taskId;
+    if (!requestId) {
+      throw new Error("Failed to create CAPTCHA task. No task ID returned.");
+    }
+
+    // Step 2: Poll for the result
+    let result;
+    do {
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+      const resultResponse = await axios.post(
+        "https://api.capmonster.cloud/getTaskResult",
+        {
+          clientKey: config.API_KEY_CAPMONSTER,
+          taskId: requestId,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      result = resultResponse.data;
+      if (result.status === "processing") {
+        console.log(colors.yellow("CAPTCHA still processing..."));
+      }
+      retries--;
+    } while (result.status === "processing" && retries > 0);
+
+    // Step 3: Use the CAPTCHA solution
+    if (result.status === "ready") {
+      console.log(colors.green("CAPTCHA success.."));
+      return result.solution.gRecaptchaResponse; // This is the CAPTCHA token
+    } else {
+      console.error("Error captcha:", result);
+      return null;
+    }
+  } catch (error) {
+    console.error("Error captcha:", error.message);
     return null;
   }
 };
@@ -129,6 +191,8 @@ async function solveCaptcha() {
     return await solve2Captcha();
   } else if (config.TYPE_CAPTCHA === "anticaptcha") {
     return await solveAntiCaptcha();
+  } else if (config.TYPE_CAPTCHA === "monstercaptcha") {
+    return await solveMonsterCaptcha();
   }
   console.log(colors.red("Invalid type captcha"));
   return null;

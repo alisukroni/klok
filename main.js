@@ -195,7 +195,8 @@ class ClientAPI {
           return this.makeRequest(url, method, data, options);
         }
         if (error.status == 400) {
-          this.log(`Invalid request for ${url}, maybe have new update from server | contact: https://t.me/airdrophuntersieutoc to get new update!`, "error");
+          console.log(error.response.data);
+          this.log(`$Invalid request for ${url}, maybe have new update from server | contact: https://t.me/airdrophuntersieutoc to get new update!`, "error");
           return { success: false, status: error.status, error: error.response.data.error || error.response.data.message || error.message };
         }
         this.log(`Yêu cầu thất bại: ${url} | ${error.message} | đang thử lại...`, "warning");
@@ -209,17 +210,25 @@ class ClientAPI {
   }
 
   async auth() {
-    const token = await solveCaptcha();
-    if (!token) {
-      this.log("Captcha not solved, skipping...", "warning");
-      return { success: false, data: null };
+    let token = null;
+    if (settings.USE_CAPTCHA) {
+      token = await solveCaptcha();
+      if (!token) {
+        this.log("Captcha not solved, skipping...", "warning");
+        return { success: false, data: null };
+      }
     }
     const wallet = this.wallet;
     const nonce = ethers.hexlify(ethers.randomBytes(32)).slice(2);
     const timestamp = new Date().toISOString();
     const message = `klokapp.ai wants you to sign in with your Ethereum account:\n${wallet.address}\n\n\nURI: https://klokapp.ai/\nVersion: 1\nChain ID: 1\nNonce: ${nonce}\nIssued At: ${timestamp}`;
     const signedMessage = await wallet.signMessage(message);
-    const payload = { signedMessage, message, referral_code: settings.REF_CODE, recaptcha_token: token };
+    const payload = {
+      signedMessage,
+      message,
+      referral_code: settings.REF_CODE,
+      ...(token ? { recaptcha_token: token } : {}),
+    };
     return this.makeRequest(`${this.baseURL}/verify`, "post", payload, { isAuth: true });
   }
 

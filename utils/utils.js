@@ -19,6 +19,23 @@ function _isArray(obj) {
   }
 }
 
+function generateRandomEmail() {
+  let usernameLength = Math.floor(Math.random() * 5) + 8; // Random length between 8 and 12
+  const usernameCharacters = "abcdefghijklmnopqrstuvwxyz0123456789";
+  const firstCharCharacters = "abcdefghijklmnopqrstuvwxyz"; // Characters for the first position
+  let username = "";
+
+  // Ensure the first character is not a number
+  username += firstCharCharacters.charAt(Math.floor(Math.random() * firstCharCharacters.length));
+  usernameLength--; // Decrement the length since we already added the first character
+
+  for (let i = 0; i < usernameLength; i++) {
+    username += usernameCharacters.charAt(Math.floor(Math.random() * usernameCharacters.length));
+  }
+
+  return `${username}@gmail.com`;
+}
+
 function parseQueryString(query) {
   const params = new URLSearchParams(query);
   const parsedQuery = {};
@@ -69,7 +86,7 @@ function updateEnv(variable, value) {
 }
 
 async function sleep(seconds = null) {
-  if (seconds && typeof seconds === "number") return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+  if (seconds && typeof seconds === "number") return new Promise((resolve) => setTimeout(resolve, +seconds * 1000));
 
   let DELAY_BETWEEN_REQUESTS = [1, 5];
   if (seconds && Array.isArray(seconds)) {
@@ -279,4 +296,5 @@ module.exports = {
   parseQueryString,
   getRandomNineDigitNumber,
   generateRandomNumber,
+  generateRandomEmail,
 };

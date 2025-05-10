@@ -33,6 +33,8 @@ const settings = {
   ADVANCED_ANTI_DETECTION: process.env.ADVANCED_ANTI_DETECTION ? process.env.ADVANCED_ANTI_DETECTION.toLowerCase() === "true" : false,
   AUTO_CREATE_NEW_CHAT: process.env.AUTO_CREATE_NEW_CHAT ? process.env.AUTO_CREATE_NEW_CHAT.toLowerCase() === "true" : false,
   USE_PROXY: process.env.USE_PROXY ? process.env.USE_PROXY.toLowerCase() === "true" : false,
+  AUTO_CONNECT_GOOGLE: process.env.AUTO_CONNECT_GOOGLE ? process.env.AUTO_CONNECT_GOOGLE.toLowerCase() === "true" : false,
+  USE_EMAIL: process.env.USE_EMAIL ? process.env.USE_EMAIL.toLowerCase() === "true" : false,
 
   API_ID: process.env.API_ID ? process.env.API_ID : null,
   BASE_URL: process.env.BASE_URL ? process.env.BASE_URL : "https://api1-pp.klokapp.ai/v1",

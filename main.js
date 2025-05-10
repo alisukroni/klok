@@ -6,7 +6,7 @@ const { HttpsProxyAgent } = require("https-proxy-agent");
 const readline = require("readline");
 const user_agents = require("./config/userAgents");
 const settings = require("./config/config.js");
-const { sleep, loadData, getRandomNumber, saveToken, isTokenExpired, saveJson, updateEnv, decodeJWT, getRandomElement } = require("./utils/utils.js");
+const { sleep, loadData, getRandomNumber, saveToken, isTokenExpired, saveJson, updateEnv, decodeJWT, getRandomElement, generateRandomEmail } = require("./utils/utils.js");
 const { Worker, isMainThread, parentPort, workerData } = require("worker_threads");
 const { checkBaseUrl } = require("./utils/checkAPI");
 const { headers } = require("./core/header.js");
@@ -30,7 +30,7 @@ class ClientAPI {
     this.session_user_agents = this.#load_session_data();
     this.token = null;
     this.localStorage = localStorage;
-    this.wallet = new ethers.Wallet(this.itemData);
+    this.wallet = new ethers.Wallet(this.itemData.privateKey);
   }
 
   #load_session_data() {
@@ -196,8 +196,12 @@ class ClientAPI {
         }
 
         if (error.status == 401) {
-          this.log(`Unauthorized: ${url} | trying get new token...`);
-          this.token = await this.getValidToken(true);
+          this.log(`Unauthorized: ${url} | trying get new token...`, "warning");
+          const token = await this.getValidToken(true);
+          if (!token) {
+            process.exit(0);
+          }
+          this.token = token;
           return await this.makeRequest(url, method, data, options);
         }
         if (error.status == 400) {
@@ -293,6 +297,40 @@ class ClientAPI {
     });
   }
 
+  async linkGoogle(payload) {
+    return this.makeRequest(`${this.baseURL}/link-google-account`, "post", payload);
+  }
+
+  async getGoogle() {
+    return this.makeRequest(`${this.baseURL}/points/action/wallet-google-link`, "get");
+  }
+
+  async handleGoogle() {
+    const resGet = await this.getGoogle();
+    if (!resGet.success || resGet.data?.has_completed === true) return;
+    let email = this.itemData.email;
+
+    if (!email) {
+      email = generateRandomEmail();
+    }
+    this.log(`Linking email: ${email}...`);
+    const name = email.split("@")[0];
+    const payload = {
+      email: email,
+      name: name,
+      avatar_url: "https://lh3.googleusercontent.com/a/ACg8ocKJjtdIMmOYLg8oEvX11ybNYKIxsVrr1hJKFIp4yBUqyoWgLg=s96-c",
+      user_id: this.itemData.address,
+    };
+
+    const res = await this.linkGoogle(payload);
+    if (res.success) {
+      this.log(`Link google ${email} success!`, "success");
+      await this.completeTask("wallet-google-link");
+    } else {
+      this.log(`Link google ${email} failed! | ${JSON.stringify(res)}`, "warning");
+    }
+  }
+
   async handleNewThread(message, model) {
     this.log(`Creating new thread | Model: ${model}`, "warning");
     const id = uuidv4();
@@ -368,7 +406,8 @@ class ClientAPI {
       if (!threads.success) {
         this.log("Can't get threads!", "warning");
       } else {
-        currentThread = getRandomElement(threads.data);
+        const avaliableThreads = threads.data?.filter((t) => !t.deleted);
+        currentThread = getRandomElement(avaliableThreads);
       }
     }
 
@@ -433,11 +472,13 @@ class ClientAPI {
     }
   }
 
-  async handleTasks() {
+  async handleTasks(useData) {
+    const ggLinkKed = useData?.is_google_linked;
     const ids = settings.TASKS_ID;
     for (const id of ids) {
       const isCompleted = await this.getTask(id);
       if (isCompleted?.data?.has_completed === false) {
+        if (!ggLinkKed && id == "wallet-google-link") continue;
         this.log(`Trying complete task ${id}`);
         const result = await this.completeTask(id);
         if (result.success) {
@@ -478,7 +519,7 @@ class ClientAPI {
     } while (retries < 2);
     const balanceData = await this.getBalance();
     if (userData.success && balanceData.success) {
-      this.log(`Tier: ${userData.data.tier} | Points: ${balanceData.data.total_points}`, "custom");
+      this.log(`Google Linked: ${userData.data?.is_google_linked} | Tier: ${userData.data.tier} | Points: ${balanceData.data.total_points}`, "custom");
     } else {
       return this.log("Can't sync new data...skipping", "warning");
     }
@@ -494,7 +535,7 @@ class ClientAPI {
       try {
         this.proxyIP = await this.checkProxyIP();
       } catch (error) {
-        this.log(`Cannot check proxy IP: ${error.message}`, "warning");
+        this.log(`Cannot check proxy IP: ${this.proxy} |  ${error.message}`, "warning");
         return;
       }
       const timesleep = getRandomNumber(settings.DELAY_START_BOT[0], settings.DELAY_START_BOT[1]);
@@ -507,9 +548,14 @@ class ClientAPI {
     this.token = token;
     const userData = await this.handleSyncData();
     if (userData.success) {
-      if (settings.AUTO_TASK) {
-        await this.handleTasks();
+      if (settings.AUTO_CONNECT_GOOGLE) {
+        await this.handleGoogle();
       }
+
+      if (settings.AUTO_TASK) {
+        await this.handleTasks(userData.data);
+      }
+
       await sleep(1);
       await this.handleThreads();
       await sleep(1);
@@ -542,10 +588,13 @@ async function main() {
   showBanner();
   const privateKeys = loadData("privateKeys.txt");
   const proxies = loadData("proxy.txt");
-  const data = privateKeys.map((item) => (item.startsWith("0x") ? item : `0x${item}`)).reverse();
-  if (data.length == 0 || (data.length > proxies.length && settings.USE_PROXY)) {
+  let emails = [];
+  if (settings.USE_EMAIL && settings.AUTO_CONNECT_GOOGLE) {
+    emails = loadData("emails.txt");
+  }
+  if (privateKeys.length == 0 || (privateKeys.length > proxies.length && settings.USE_PROXY)) {
     console.log("Số lượng proxy và data phải bằng nhau.".red);
-    console.log(`Data: ${data.length}`);
+    console.log(`Data: ${privateKeys.length}`);
     console.log(`Proxy: ${proxies.length}`);
     process.exit(1);
   }
@@ -558,7 +607,18 @@ async function main() {
   if (!endpoint) return console.log(`Không thể tìm thấy ID API, thử lại sau!`.red);
   console.log(`${message}`.yellow);
   // process.exit();
-  data.map((val, i) => new ClientAPI(val, i, proxies[i], endpoint).createUserAgent());
+  const data = privateKeys.map((val, index) => {
+    const prvk = val.startsWith("0x") ? val : `0x${val}`;
+    const wallet = new ethers.Wallet(prvk);
+    const item = {
+      address: wallet.address,
+      privateKey: prvk,
+      email: emails[index],
+    };
+    new ClientAPI(item, index, proxies[index], endpoint, {}).createUserAgent();
+    return item;
+  });
+
   await sleep(1);
   while (true) {
     let currentIndex = 0;

@@ -11,7 +11,7 @@ const solve2Captcha = async () => {
       {
         clientKey: config.API_KEY_2CAPTCHA,
         task: {
-          type: "RecaptchaV3TaskProxyless",
+          type: "TurnstileTaskProxyless",
           websiteURL: config.CAPTCHA_URL,
           websiteKey: config.WEBSITE_KEY,
           minScore: 0.9,
@@ -51,7 +51,7 @@ const solve2Captcha = async () => {
     // Step 3: Use the CAPTCHA solution
     if (result.status === "ready") {
       console.log(colors.green("CAPTCHA success.."));
-      return result.solution.gRecaptchaResponse; // This is the CAPTCHA token
+      return result.solution.token; // This is the CAPTCHA token
     } else {
       console.error("Error captcha:", result);
       return null;
@@ -71,10 +71,9 @@ const solveAntiCaptcha = async () => {
       {
         clientKey: config.API_KEY_ANTI_CAPTCHA,
         task: {
-          type: "RecaptchaV3TaskProxyless",
+          type: "TurnstileTaskProxyless",
           websiteURL: config.CAPTCHA_URL,
           websiteKey: config.WEBSITE_KEY,
-          minScore: 0.9,
         },
       },
       {
@@ -113,7 +112,7 @@ const solveAntiCaptcha = async () => {
     // Step 3: Use the CAPTCHA solution
     if (result.status === "ready") {
       console.log(colors.green("CAPTCHA success.."));
-      return result.solution.gRecaptchaResponse; // This is the CAPTCHA token
+      return result.solution.token; // This is the CAPTCHA token
     } else {
       console.error("Error captcha:", result);
       return null;
@@ -133,10 +132,9 @@ const solveMonsterCaptcha = async () => {
       {
         clientKey: config.API_KEY_CAPMONSTER,
         task: {
-          type: "RecaptchaV3TaskProxyless",
+          type: "TurnstileTaskProxyless",
           websiteURL: config.CAPTCHA_URL,
           websiteKey: config.WEBSITE_KEY,
-          minScore: 0.9,
         },
       },
       {
@@ -175,7 +173,7 @@ const solveMonsterCaptcha = async () => {
     // Step 3: Use the CAPTCHA solution
     if (result.status === "ready") {
       console.log(colors.green("CAPTCHA success.."));
-      return result.solution.gRecaptchaResponse; // This is the CAPTCHA token
+      return result.solution.token; // This is the CAPTCHA token
     } else {
       console.error("Error captcha:", result);
       return null;

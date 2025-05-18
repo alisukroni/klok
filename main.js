@@ -225,10 +225,12 @@ class ClientAPI {
   async auth() {
     let token = null;
     if (settings.USE_CAPTCHA) {
+      this.log(`Solving captcha...`);
       token = await solveCaptcha();
       if (!token) {
         this.log("Captcha not solved, skipping...", "warning");
-        return { success: false, data: null };
+        await sleep(1);
+        process.exit(0);
       }
     }
     const wallet = this.wallet;
@@ -240,9 +242,13 @@ class ClientAPI {
       signedMessage,
       message,
       referral_code: settings.REF_CODE,
-      ...(token ? { recaptcha_token: token } : {}),
     };
-    return this.makeRequest(`${this.baseURL}/verify`, "post", payload, { isAuth: true });
+    return this.makeRequest(`${this.baseURL}/verify`, "post", payload, {
+      isAuth: true,
+      extraHeaders: {
+        "x-turnstile-token": token,
+      },
+    });
   }
 
   async getUserData() {

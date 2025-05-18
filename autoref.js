@@ -8,6 +8,7 @@ const { SocksProxyAgent } = require("socks-proxy-agent");
 const { loadData, saveJson, getRandomElement, getRandomNumber, sleep } = require("./utils/utils.js");
 const colors = require("colors");
 const settings = require("./config/config.js");
+const { solveCaptcha } = require("./utils/captcha.js");
 
 function generateWallet() {
   const wallet = Wallet.createRandom();
@@ -26,7 +27,15 @@ async function signMessageAndRegister(wallet, agent) {
   console.log(`📝 Signing Message for ${address}`);
   const signedMessage = await wallet.signMessage(message);
   const payload = { signedMessage, message, referral_code: settings.REF_CODE };
-
+  let token = null;
+  if (settings.USE_CAPTCHA) {
+    console.log(`Solving captcha...`);
+    token = await solveCaptcha();
+    if (!token) {
+      console.log("Captcha not solved, skipping...".yellow);
+      return null;
+    }
+  }
   try {
     const response = await axios.post(`${settings.BASE_URL}/verify`, payload, {
       headers: {
@@ -34,6 +43,7 @@ async function signMessageAndRegister(wallet, agent) {
         "User-Agent": "Mozilla/5.0",
         Origin: "https://klokapp.ai",
         Referer: "https://klokapp.ai/",
+        "x-turnstile-token": token,
       },
       httpAgent: agent, // Use the agent for the request
     });
